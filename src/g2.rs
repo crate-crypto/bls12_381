@@ -18,6 +18,9 @@ use crate::fp::Fp;
 use crate::fp2::Fp2;
 use crate::Scalar;
 
+#[cfg(target_family = "wasm")]
+use js_sys::Array;
+
 /// This is an element of $\mathbb{G}_2$ represented in the affine coordinate space.
 /// It is ideal to keep elements in this representation to reduce memory usage and
 /// improve performance through the use of mixed curve model arithmetic.
@@ -486,6 +489,130 @@ impl G2Affine {
     pub fn is_on_curve(&self) -> Choice {
         // y^2 - x^3 ?= 4(u + 1)
         (self.y.square() - (self.x.square() * self.x)).ct_eq(&B) | self.infinity
+    }
+}
+
+/// This is an element of $\mathbb{G}_2$ represented in the affine coordinate space.
+/// It is ideal to keep elements in this representation to reduce memory usage and
+/// improve performance through the use of mixed curve model arithmetic.
+///
+/// Values of `G2Affine` are guaranteed to be in the $q$-order subgroup unless an
+/// "unchecked" API was misused.
+#[cfg(target_family = "wasm")]
+#[wasm_bindgen::prelude::wasm_bindgen]
+#[cfg_attr(docsrs, doc(cfg(feature = "groups")))]
+#[derive(Copy, Clone, Debug)]
+pub struct G2AffineW(pub(crate) G2Affine);
+impl_from_direct!(G2AffineW, G2Affine);
+impl_from_for_wasm_wrapped!(G2AffineW, G2Affine, G2ProjectiveW);
+
+#[cfg(target_family = "wasm")]
+#[wasm_bindgen::prelude::wasm_bindgen]
+impl G2AffineW {
+    /// Creates a default instance of G2AffineW.
+    #[wasm_bindgen::prelude::wasm_bindgen(constructor)]
+    pub fn constructor() -> G2AffineW {
+        G2Affine::default().into()
+    }
+
+    /// Returns the identity of the group: the point at infinity.
+    pub fn identity() -> G2AffineW {
+        G2Affine::identity().into()
+    }
+
+    /// Returns a fixed generator of the group. See [`notes::design`](notes/design/index.html#fixed-generators)
+    /// for how this generator is chosen.
+    pub fn generator() -> G2AffineW {
+        G2Affine::generator().into()
+    }
+
+    /// Serializes this element into compressed form. See [`notes::serialization`](crate::notes::serialization)
+    /// for details about how group elements are serialized.
+    pub fn to_compressed(&self) -> Vec<u8> {
+        let r = self.0.to_compressed();
+        assert!(r.len() == 96);
+        r.to_vec()
+    }
+
+    /// Serializes this element into uncompressed form. See [`notes::serialization`](crate::notes::serialization)
+    /// for details about how group elements are serialized.
+    pub fn to_uncompressed(&self) -> Vec<u8> {
+        let r = self.0.to_uncompressed();
+        assert!(r.len() == 192);
+        r.to_vec()
+    }
+
+    /// Attempts to deserialize an uncompressed element. See [`notes::serialization`](crate::notes::serialization)
+    /// for details about how group elements are serialized.
+    pub fn from_uncompressed(bytes: Vec<u8>) -> Option<G2AffineW> {
+        assert!(bytes.len() == 192);
+        let mut b = [0u8; 192];
+        b.copy_from_slice(bytes.as_slice());
+        let g2_option = G2Affine::from_uncompressed(&b);
+        if g2_option.is_some().into() {
+            Some(g2_option.unwrap().into())
+        } else {
+            None
+        }
+    }
+
+    /// Attempts to deserialize an uncompressed element, not checking if the
+    /// element is on the curve and not checking if it is in the correct subgroup.
+    /// **This is dangerous to call unless you trust the bytes you are reading; otherwise,
+    /// API invariants may be broken.** Please consider using `from_uncompressed()` instead.
+    pub fn from_uncompressed_unchecked(bytes: Vec<u8>) -> Option<G2AffineW> {
+        assert!(bytes.len() == 192);
+        let mut b = [0u8; 192];
+        b.copy_from_slice(bytes.as_slice());
+        let g2_option = G2Affine::from_uncompressed_unchecked(&b);
+        if g2_option.is_some().into() {
+            Some(g2_option.unwrap().into())
+        } else {
+            None
+        }
+    }
+
+    /// Attempts to deserialize a compressed element. See [`notes::serialization`](crate::notes::serialization)
+    /// for details about how group elements are serialized.
+    pub fn from_compressed(bytes: Vec<u8>) -> Option<G2AffineW> {
+        assert!(bytes.len() == 96);
+        let mut b = [0u8; 96];
+        b.copy_from_slice(bytes.as_slice());
+        let g2_option = G2Affine::from_compressed(&b);
+        if g2_option.is_some().into() {
+            Some(g2_option.unwrap().into())
+        } else {
+            None
+        }
+    }
+
+    /// Attempts to deserialize an uncompressed element, not checking if the
+    /// element is in the correct subgroup.
+    /// **This is dangerous to call unless you trust the bytes you are reading; otherwise,
+    /// API invariants may be broken.** Please consider using `from_compressed()` instead.
+    pub fn from_compressed_unchecked(bytes: Vec<u8>) -> Option<G2AffineW> {
+        assert!(bytes.len() == 96);
+        let mut b = [0u8; 96];
+        b.copy_from_slice(bytes.as_slice());
+        let g2_option = G2Affine::from_compressed_unchecked(&b);
+        if g2_option.is_some().into() {
+            Some(g2_option.unwrap().into())
+        } else {
+            None
+        }
+    }
+
+    /// Returns true if this element is the identity (the point at infinity).
+    #[inline]
+    pub fn is_identity(&self) -> bool {
+        self.0.is_identity().into()
+    }
+
+    /// Returns true if this point is free of an $h$-torsion component, and so it
+    /// exists within the $q$-order subgroup $\mathbb{G}_1$. This should always return true
+    /// unless an "unchecked" API was used.
+    pub fn is_torsion_free(&self) -> bool {
+        self.0.is_torsion_free().into()
     }
 }
 
@@ -999,6 +1126,142 @@ impl G2Projective {
     }
 }
 
+/// This is an element of $\mathbb{G}_2$ represented in the projective coordinate space.
+#[cfg(target_family = "wasm")]
+#[wasm_bindgen::prelude::wasm_bindgen]
+#[cfg_attr(docsrs, doc(cfg(feature = "groups")))]
+#[derive(Copy, Clone, Debug)]
+pub struct G2ProjectiveW(pub(crate) G2Projective);
+impl_from_direct!(G2ProjectiveW, G2Projective);
+impl_from_for_wasm_wrapped!(G2ProjectiveW, G2Projective, G2AffineW);
+
+#[cfg(target_family = "wasm")]
+#[wasm_bindgen::prelude::wasm_bindgen]
+impl G2ProjectiveW {
+    /// Creates a default instance of G2ProjectiveW.
+    #[wasm_bindgen::prelude::wasm_bindgen(constructor)]
+    pub fn constructor() -> G2ProjectiveW {
+        G2Projective::default().into()
+    }
+
+    /// Returns the identity of the group: the point at infinity.
+    pub fn identity() -> G2ProjectiveW {
+        G2Projective::identity().into()
+    }
+
+    /// Returns a fixed generator of the group. See [`notes::design`](notes/design/index.html#fixed-generators)
+    /// for how this generator is chosen.
+    pub fn generator() -> G2ProjectiveW {
+        G2Projective::generator().into()
+    }
+
+    /// Computes the doubling of this point.
+    pub fn double(&self) -> G2ProjectiveW {
+        self.0.double().into()
+    }
+
+    /// Adds this point to another point.
+    pub fn add(&self, rhs: &G2ProjectiveW) -> G2ProjectiveW {
+        self.0.add(rhs.0).into()
+    }
+
+    /// Adds this point to another point in the affine model.
+    pub fn add_mixed(&self, rhs: &G2AffineW) -> G2ProjectiveW {
+        self.0.add_mixed(&rhs.0).into()
+    }
+
+    /// Multiplies by $(1 - z)$, where $z$ is the parameter of BLS12-381, which
+    /// [suffices to clear](https://ia.cr/2019/403) the cofactor and map
+    /// elliptic curve points to elements of $\mathbb{G}\_1$.
+    pub fn clear_cofactor(&self) -> G2ProjectiveW {
+        self.0.clear_cofactor().into()
+    }
+
+    /// Converts a batch of `G2Projective` elements into `G2Affine` elements. This
+    /// function will panic if `p.len() != q.len()`.
+    pub fn batch_normalize(p: Array, q: Array) {
+        assert_eq!(p.length(), q.length());
+        // the standard way of serialization/deserialization doesn't work
+        // the way with casting of WebAssembly pointers works and it should be much faster
+
+        // unwrap results because function can throw errors but not return an Error
+        let p_v = p
+            .into_iter()
+            .map(|e| {
+                let proto_name = js_sys::Reflect::get_prototype_of(&e)
+                    .unwrap()
+                    .constructor()
+                    .name();
+                assert!(
+                    proto_name == "G2ProjectiveW",
+                    "Expects instance of \"G2ProjectiveW\", byt got {}.",
+                    proto_name
+                );
+                let ptr_f64 = js_sys::Reflect::get(&e, &"__wbg_ptr".into())
+                    .unwrap()
+                    .as_f64()
+                    .unwrap();
+                assert!(
+                    ptr_f64 > 0.0,
+                    "Expects valid instance pointer, but used moved value."
+                );
+                // the 8 is one byte offset between pointer and the data of the instance
+                let ptr = (ptr_f64 as u32 + 8) as *const G2ProjectiveW;
+                ptr
+            })
+            .collect::<Vec<_>>();
+        let q_v = q
+            .into_iter()
+            .map(|e| {
+                let proto_name = js_sys::Reflect::get_prototype_of(&e)
+                    .unwrap() // unwrap because function can throw errors but not return an Error
+                    .constructor()
+                    .name();
+                assert!(
+                    proto_name == "G2AffineW",
+                    "Expects instance of \"G2AffineW\", byt got {}.",
+                    proto_name
+                );
+                let ptr_f64 = js_sys::Reflect::get(&e, &"__wbg_ptr".into())
+                    .unwrap()
+                    .as_f64()
+                    .unwrap();
+                assert!(
+                    ptr_f64 > 0.0,
+                    "Expects valid instance pointer, but used moved value."
+                );
+                // the 8 is one byte offset between pointer and the data of the instance
+                let ptr = (ptr_f64 as u32 + 8) as *const G2AffineW;
+                ptr
+            })
+            .collect::<Vec<_>>();
+
+        // Safety:
+        // - the objects are placed in single memory instance
+        // - checked that pointer is valid
+        // - checked prototype of the object
+        #[allow(unsafe_code)]
+        unsafe {
+            let p: Vec<G2Projective> = p_v.into_iter().map(|e| (*e).0).collect();
+            let mut q: Vec<G2Affine> = q_v.into_iter().map(|e| (*e).0).collect();
+            G2Projective::batch_normalize(p.as_slice(), &mut q[..]);
+        }
+    }
+
+    /// Returns true if this element is the identity (the point at infinity).
+    #[inline]
+    pub fn is_identity(&self) -> bool {
+        self.0.is_identity().into()
+    }
+
+    /// Returns true if this point is on the curve. This should always return
+    /// true unless an "unchecked" API was used.
+    pub fn is_on_curve(&self) -> bool {
+        self.0.is_on_curve().into()
+    }
+}
+
+#[cfg_attr(target_family = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Clone, Copy)]
 pub struct G2Compressed([u8; 96]);
 
@@ -1043,6 +1306,17 @@ impl PartialEq for G2Compressed {
     }
 }
 
+#[cfg(target_family = "wasm")]
+#[wasm_bindgen::prelude::wasm_bindgen]
+impl G2Compressed {
+    /// Creates a default instance of G2Compressed.
+    #[wasm_bindgen::prelude::wasm_bindgen(constructor)]
+    pub fn constructor() -> G2Compressed {
+        G2Compressed::default()
+    }
+}
+
+#[cfg_attr(target_family = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Clone, Copy)]
 pub struct G2Uncompressed([u8; 192]);
 
@@ -1084,6 +1358,16 @@ impl PartialEq for G2Uncompressed {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         bool::from(self.ct_eq(other))
+    }
+}
+
+#[cfg(target_family = "wasm")]
+#[wasm_bindgen::prelude::wasm_bindgen]
+impl G2Uncompressed {
+    /// Creates a default instance of G2Uncompressed.
+    #[wasm_bindgen::prelude::wasm_bindgen(constructor)]
+    pub fn constructor() -> G2Uncompressed {
+        G2Uncompressed::default()
     }
 }
 

@@ -627,6 +627,148 @@ impl Scalar {
     }
 }
 
+/// Represents an element of the scalar field $\mathbb{F}_q$ of the BLS12-381 elliptic
+/// curve construction.
+// The internal representation of this type is four 64-bit unsigned
+// integers in little-endian order. `Scalar` values are always in
+// Montgomery form; i.e., Scalar(a) = aR mod q, with R = 2^256.
+#[cfg(target_family = "wasm")]
+#[wasm_bindgen::prelude::wasm_bindgen]
+#[derive(Debug, Copy, Clone)]
+pub struct ScalarW(pub(crate) Scalar);
+impl_from_direct!(ScalarW, Scalar);
+
+#[cfg(target_family = "wasm")]
+#[wasm_bindgen::prelude::wasm_bindgen]
+impl ScalarW {
+    /// Creates a default instance of ScalarW.
+    #[wasm_bindgen::prelude::wasm_bindgen(constructor)]
+    pub fn constructor() -> ScalarW {
+        Scalar::default().into()
+    }
+
+    /// Returns zero, the additive identity.
+    #[inline]
+    pub fn zero() -> ScalarW {
+        Scalar::zero().into()
+    }
+
+    /// Returns one, the multiplicative identity.
+    #[inline]
+    pub fn one() -> ScalarW {
+        Scalar::one().into()
+    }
+
+    /// Doubles this field element.
+    #[inline]
+    pub fn double(&self) -> ScalarW {
+        self.0.double().into()
+    }
+
+    /// Attempts to convert a little-endian byte representation of
+    /// a scalar into a `Scalar`, failing if the input is not canonical.
+    pub fn from_bytes(bytes: Vec<u8>) -> Option<ScalarW> {
+        assert!(bytes.len() == 32);
+        let mut b = [0u8; 32];
+        b.copy_from_slice(bytes.as_slice());
+        let s_option = Scalar::from_bytes(&b);
+        if s_option.is_some().into() {
+            Some(s_option.unwrap().into())
+        } else {
+            None
+        }
+    }
+
+    /// Converts an element of `Scalar` into a byte representation in
+    /// little-endian byte order.
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let r = self.0.to_bytes();
+        assert!(r.len() == 32);
+        r.to_vec()
+    }
+
+    /// Converts a 512-bit little endian integer into
+    /// a `Scalar` by reducing by the modulus.
+    pub fn from_bytes_wide(bytes: Vec<u8>) -> ScalarW {
+        assert!(bytes.len() == 64);
+        let mut b = [0u8; 64];
+        b.copy_from_slice(bytes.as_slice());
+        Scalar::from_bytes_wide(&b).into()
+    }
+
+    /// Converts from an integer represented in little endian
+    /// into its (congruent) `Scalar` representation.
+    pub fn from_raw(val: Vec<u64>) -> ScalarW {
+        assert!(val.len() == 4);
+        let mut b = [0u64; 4];
+        b.copy_from_slice(val.as_slice());
+        Scalar::from_raw(b).into()
+    }
+
+    /// Squares this element.
+    #[inline]
+    pub fn square(&self) -> ScalarW {
+        self.0.square().into()
+    }
+
+    /// Exponentiates `self` by `by`, where `by` is a
+    /// little-endian order integer exponent.
+    pub fn pow(&self, by: Vec<u64>) -> ScalarW {
+        assert!(by.len() == 4);
+        let mut b = [0u64; 4];
+        b.copy_from_slice(by.as_slice());
+        self.0.pow(&b).into()
+    }
+
+    /// Exponentiates `self` by `by`, where `by` is a
+    /// little-endian order integer exponent.
+    ///
+    /// **This operation is variable time with respect
+    /// to the exponent.** If the exponent is fixed,
+    /// this operation is effectively constant time.
+    pub fn pow_vartime(&self, by: Vec<u64>) -> ScalarW {
+        assert!(by.len() == 4);
+        let mut b = [0u64; 4];
+        b.copy_from_slice(by.as_slice());
+        self.0.pow_vartime(&b).into()
+    }
+
+    /// Computes the multiplicative inverse of this element,
+    /// failing if the element is zero.
+    pub fn invert(&self) -> Option<ScalarW> {
+        let s_option = self.0.invert();
+        if s_option.is_some().into() {
+            Some(s_option.unwrap().into())
+        } else {
+            None
+        }
+    }
+
+    /// Multiplies `rhs` by `self`, returning the result.
+    #[inline]
+    pub fn mul(&self, rhs: &ScalarW) -> ScalarW {
+        self.0.mul(rhs.0).into()
+    }
+
+    /// Subtracts `rhs` from `self`, returning the result.
+    #[inline]
+    pub fn sub(&self, rhs: &ScalarW) -> ScalarW {
+        self.0.sub(rhs.0).into()
+    }
+
+    /// Adds `rhs` to `self`, returning the result.
+    #[inline]
+    pub fn add(&self, rhs: &ScalarW) -> ScalarW {
+        self.0.add(rhs.0).into()
+    }
+
+    /// Negates `self`.
+    #[inline]
+    pub fn neg(&self) -> ScalarW {
+        self.0.neg().into()
+    }
+}
+
 impl From<Scalar> for [u8; 32] {
     fn from(value: Scalar) -> [u8; 32] {
         value.to_bytes()
@@ -640,8 +782,8 @@ impl<'a> From<&'a Scalar> for [u8; 32] {
 }
 
 impl Field for Scalar {
-    const ZERO: Self = Self::zero();
-    const ONE: Self = Self::one();
+    const ZERO: Self = Scalar::zero();
+    const ONE: Self = Scalar::one();
 
     fn random(mut rng: impl RngCore) -> Self {
         let mut buf = [0; 64];
